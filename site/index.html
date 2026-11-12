@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLMOps Platform — Self-Hosted AI Infrastructure</title>
+  <meta name="description" content="A self-hosted LLM serving and RAG platform built with Ollama, FastAPI, ChromaDB, Prometheus and Grafana.">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#030712;--card:#111827;--card2:#1f2937;
+      --border:rgba(255,255,255,0.08);
+      --blue:#3b82f6;--green:#10b981;--amber:#f59e0b;--purple:#8b5cf6;--red:#ef4444;
+      --text:#f1f5f9;--muted:#94a3b8;--dim:#4b5563
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.6;overflow-x:hidden}
+
+    /* ── NAV ── */
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;backdrop-filter:blur(20px);background:rgba(3,7,18,.85);border-bottom:1px solid var(--border);height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem}
+    .brand{font-weight:700;font-size:.95rem;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:.6rem}
+    .brand-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.6)}}
+    .nav-links{display:flex;gap:1.75rem;list-style:none}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:.85rem;transition:color .2s}
+    .nav-links a:hover{color:var(--text)}
+    .nav-gh{display:flex;align-items:center;gap:.45rem;padding:.4rem 1rem;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);text-decoration:none;font-size:.8rem;font-weight:600;transition:all .2s}
+    .nav-gh:hover{border-color:var(--blue)}
+    @media(max-width:640px){.nav-links{display:none}}
+
+    /* ── UTILS ── */
+    .container{max-width:1080px;margin:0 auto;padding:0 2rem}
+    section{padding:5.5rem 0}
+    .label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--blue);margin-bottom:.6rem}
+    .title{font-size:1.9rem;font-weight:800;margin-bottom:.75rem;line-height:1.2}
+    .subtitle{color:var(--muted);max-width:540px;margin-bottom:2.5rem;font-size:.95rem}
+
+    /* ── HERO ── */
+    #hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden}
+    .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 50% -10%,rgba(59,130,246,.18) 0%,transparent 60%),radial-gradient(ellipse 50% 50% at 85% 90%,rgba(139,92,246,.12) 0%,transparent 55%),var(--bg)}
+    .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(ellipse 90% 80% at 50% 50%,black,transparent)}
+    .hero-inner{position:relative;text-align:center;width:100%}
+    .hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.35rem 1rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:100px;font-size:.78rem;color:var(--blue);margin-bottom:1.5rem;font-weight:600}
+    .hero-badge .dot{width:6px;height:6px;background:var(--blue);border-radius:50%;animation:pulse 1.8s ease-in-out infinite}
+    h1{font-size:clamp(2.4rem,6vw,4.5rem);font-weight:900;line-height:1.08;margin-bottom:1.25rem;background:linear-gradient(140deg,#fff 20%,#94a3b8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero-sub{font-size:1.1rem;color:var(--muted);max-width:560px;margin:0 auto 2.25rem}
+    .hero-actions{display:flex;gap:.85rem;justify-content:center;flex-wrap:wrap;margin-bottom:3rem}
+    .btn{display:inline-flex;align-items:center;gap:.45rem;padding:.65rem 1.4rem;border-radius:8px;font-size:.88rem;font-weight:600;text-decoration:none;transition:all .2s;border:none;cursor:pointer}
+    .btn-blue{background:var(--blue);color:#fff}
+    .btn-blue:hover{background:#2563eb;transform:translateY(-1px);box-shadow:0 8px 24px rgba(59,130,246,.35)}
+    .btn-ghost{background:var(--card);color:var(--text);border:1px solid var(--border)}
+    .btn-ghost:hover{border-color:var(--blue);transform:translateY(-1px)}
+    .hero-pills{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}
+    .pill{display:flex;align-items:center;gap:.4rem;padding:.3rem .85rem;background:var(--card);border:1px solid var(--border);border-radius:6px;font-size:.78rem;color:var(--muted)}
+
+    /* ── ARCHITECTURE ── */
+    #architecture{background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .arch-wrap{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:2rem;overflow:hidden}
+    .arch-svg{width:100%;max-width:860px;display:block;margin:0 auto}
+
+    /* animated flow lines */
+    @keyframes flowdash{to{stroke-dashoffset:-30}}
+    .fl{stroke-dasharray:10 7;animation:flowdash .9s linear infinite}
+    .fl2{stroke-dasharray:10 7;animation:flowdash .9s linear infinite;animation-delay:-.3s}
+    .fl3{stroke-dasharray:10 7;animation:flowdash .9s linear infinite;animation-delay:-.6s}
+    .fl4{stroke-dasharray:10 7;animation:flowdash .9s linear infinite;animation-delay:-.15s}
+    .fl5{stroke-dasharray:10 7;animation:flowdash .9s linear infinite;animation-delay:-.45s}
+
+    .arch-legend{display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center;margin-top:1.5rem}
+    .legend-item{display:flex;align-items:center;gap:.45rem;font-size:.78rem;color:var(--muted)}
+    .legend-line{width:24px;height:2px;border-top:2px dashed}
+
+    /* ── HOW IT WORKS ── */
+    .tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;width:fit-content;margin-bottom:2rem}
+    .tab{padding:.55rem 1.25rem;border:none;background:var(--card);color:var(--muted);font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap}
+    .tab.active{background:var(--blue);color:#fff}
+    .tab:not(:last-child){border-right:1px solid var(--border)}
+    .panel{display:none;grid-template-columns:1fr;gap:.85rem}
+    .panel.active{display:grid}
+    .step{display:flex;gap:1.1rem;align-items:flex-start;padding:1.1rem 1.25rem;background:var(--card);border:1px solid var(--border);border-radius:10px;transition:border-color .2s}
+    .step:hover{border-color:rgba(59,130,246,.4)}
+    .step-n{flex-shrink:0;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:var(--blue)}
+    .step h4{font-size:.9rem;font-weight:700;margin-bottom:.2rem}
+    .step p{font-size:.82rem;color:var(--muted)}
+    .chip{display:inline-block;padding:.15rem .55rem;border-radius:4px;font-size:.7rem;font-weight:700;margin-top:.35rem;text-transform:uppercase;letter-spacing:.05em}
+    .chip-blue{background:rgba(59,130,246,.12);color:var(--blue)}
+    .chip-green{background:rgba(16,185,129,.12);color:var(--green)}
+    .chip-purple{background:rgba(139,92,246,.12);color:var(--purple)}
+    .chip-amber{background:rgba(245,158,11,.12);color:var(--amber)}
+
+    /* ── METRICS ── */
+    #metrics{background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .disclaimer{display:inline-flex;align-items:center;gap:.5rem;padding:.35rem 1rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:100px;font-size:.75rem;color:var(--amber);margin-bottom:2rem;font-weight:600}
+    .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.75rem}
+    .stat{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1.25rem}
+    .stat-lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.4rem}
+    .stat-val{font-size:1.8rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+    .stat-delta{font-size:.75rem;color:var(--green);margin-top:.35rem}
+    .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+    .chart-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1.4rem}
+    .chart-lbl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:1rem}
+    @media(max-width:720px){.stat-row{grid-template-columns:1fr 1fr}.charts-grid{grid-template-columns:1fr}}
+
+    /* ── TECH STACK ── */
+    .tech-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+    .tech-card{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:1.4rem;transition:all .2s}
+    .tech-card:hover{border-color:rgba(59,130,246,.4);transform:translateY(-2px)}
+    .tech-icon{font-size:1.8rem;margin-bottom:.7rem}
+    .tech-name{font-weight:800;font-size:.92rem;margin-bottom:.25rem}
+    .tech-role{font-size:.7rem;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.45rem}
+    .tech-desc{font-size:.8rem;color:var(--muted);line-height:1.5}
+    @media(max-width:720px){.tech-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:480px){.tech-grid{grid-template-columns:1fr}}
+
+    /* ── API ── */
+    .api-cards{display:grid;gap:1.1rem}
+    .api-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+    .api-head{display:flex;align-items:center;gap:.75rem;padding:.7rem 1.2rem;background:var(--card2);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.5rem}
+    .method{padding:.2rem .65rem;border-radius:4px;font-size:.72rem;font-weight:800}
+    .m-post{background:rgba(16,185,129,.15);color:var(--green)}
+    .m-get{background:rgba(59,130,246,.15);color:var(--blue)}
+    .api-path{font-family:'SF Mono','Fira Code',monospace;font-size:.82rem}
+    .api-note{font-size:.78rem;color:var(--muted);margin-left:auto}
+    pre{padding:1.2rem;font-family:'SF Mono','Fira Code',monospace;font-size:.78rem;line-height:1.7;color:#94a3b8;overflow-x:auto}
+    .k{color:#93c5fd}.s{color:#86efac}.n{color:#fca5a5}.c{color:var(--dim)}
+
+    /* ── FOOTER ── */
+    footer{border-top:1px solid var(--border);padding:2.5rem 0;text-align:center;color:var(--dim);font-size:.83rem}
+    footer a{color:var(--blue);text-decoration:none}
+    footer a:hover{text-decoration:underline}
+    .footer-stack{display:flex;justify-content:center;gap:.75rem;margin-top:1rem;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+
+<!-- ══════════ NAV ══════════ -->
+<nav>
+  <a class="brand" href="#">
+    <span class="brand-dot"></span>
+    LLMOps Platform
+  </a>
+  <ul class="nav-links">
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#workflows">How it works</a></li>
+    <li><a href="#metrics">Metrics</a></li>
+    <li><a href="#stack">Stack</a></li>
+    <li><a href="#api">API</a></li>
+  </ul>
+  <a class="nav-gh" href="https://github.com/Badsati/llmops" target="_blank">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+    GitHub
+  </a>
+</nav>
+
+<!-- ══════════ HERO ══════════ -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="container">
+    <div class="hero-inner">
+      <div class="hero-badge"><span class="dot"></span>Open Source · Self-Hosted · CPU &amp; GPU</div>
+      <h1>Self-Hosted LLM Serving<br>&amp; RAG Platform</h1>
+      <p class="hero-sub">A production-oriented AI infrastructure stack that runs entirely on your own hardware. Serve open-source LLMs, build document-grounded Q&amp;A, and monitor everything — no cloud APIs required.</p>
+      <div class="hero-actions">
+        <a class="btn btn-blue" href="#architecture">Explore Architecture</a>
+        <a class="btn btn-ghost" href="https://github.com/Badsati/llmops" target="_blank">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          View Codebase
+        </a>
+      </div>
+      <div class="hero-pills">
+        <span class="pill">🤖 Qwen 2.5 3B</span>
+        <span class="pill">⚡ FastAPI</span>
+        <span class="pill">🗄 ChromaDB</span>
+        <span class="pill">📊 Prometheus + Grafana</span>
+        <span class="pill">☸️ Kubernetes + Helm</span>
+        <span class="pill">🐳 Docker Compose</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ ARCHITECTURE ══════════ -->
+<section id="architecture">
+  <div class="container">
+    <p class="label">System Design</p>
+    <h2 class="title">Platform Architecture</h2>
+    <p class="subtitle">Five components, one stack. Data flows from client requests through the API gateway, into the LLM and vector store, with every request captured by the observability layer.</p>
+
+    <div class="arch-wrap">
+      <svg class="arch-svg" viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- gradient fills for component boxes -->
+          <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1d4ed8" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#1e3a8a" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#059669" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#065f46" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="gPurple" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#7c3aed" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#4c1d95" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="gAmber" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#d97706" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#92400e" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="gGray" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#374151" stop-opacity=".9"/>
+            <stop offset="100%" stop-color="#1f2937" stop-opacity=".9"/>
+          </linearGradient>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#3b82f6" opacity=".8"/>
+          </marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#10b981" opacity=".8"/>
+          </marker>
+          <marker id="arrow-purple" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#8b5cf6" opacity=".8"/>
+          </marker>
+          <marker id="arrow-amber" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#f59e0b" opacity=".8"/>
+          </marker>
+        </defs>
+
+        <!-- ── background subtle grid ── -->
+        <rect width="880" height="420" fill="transparent"/>
+        <g opacity=".06">
+          <line x1="0" y1="0" x2="880" y2="0" stroke="white"/><line x1="0" y1="60" x2="880" y2="60" stroke="white"/>
+          <line x1="0" y1="120" x2="880" y2="120" stroke="white"/><line x1="0" y1="180" x2="880" y2="180" stroke="white"/>
+          <line x1="0" y1="240" x2="880" y2="240" stroke="white"/><line x1="0" y1="300" x2="880" y2="300" stroke="white"/>
+          <line x1="0" y1="360" x2="880" y2="360" stroke="white"/><line x1="0" y1="420" x2="880" y2="420" stroke="white"/>
+          <line x1="0" y1="0" x2="0" y2="420" stroke="white"/><line x1="110" y1="0" x2="110" y2="420" stroke="white"/>
+          <line x1="220" y1="0" x2="220" y2="420" stroke="white"/><line x1="330" y1="0" x2="330" y2="420" stroke="white"/>
+          <line x1="440" y1="0" x2="440" y2="420" stroke="white"/><line x1="550" y1="0" x2="550" y2="420" stroke="white"/>
+          <line x1="660" y1="0" x2="660" y2="420" stroke="white"/><line x1="770" y1="0" x2="770" y2="420" stroke="white"/>
+          <line x1="880" y1="0" x2="880" y2="420" stroke="white"/>
+        </g>
+
+        <!-- ── CONNECTION LINES (base) ── -->
+        <!-- User → FastAPI -->
+        <path d="M 128 190 C 165 190 180 195 215 195" stroke="rgba(59,130,246,.15)" stroke-width="2" fill="none"/>
+        <!-- FastAPI → Ollama -->
+        <path d="M 395 170 C 440 170 460 110 500 110" stroke="rgba(16,185,129,.15)" stroke-width="2" fill="none"/>
+        <!-- FastAPI → ChromaDB -->
+        <path d="M 395 215 C 440 215 460 235 500 235" stroke="rgba(139,92,246,.15)" stroke-width="2" fill="none"/>
+        <!-- FastAPI → Prometheus -->
+        <path d="M 305 275 L 305 325" stroke="rgba(245,158,11,.15)" stroke-width="2" fill="none"/>
+        <!-- Prometheus → Grafana -->
+        <path d="M 400 355 C 440 355 460 350 495 350" stroke="rgba(245,158,11,.15)" stroke-width="2" fill="none"/>
+
+        <!-- ── ANIMATED FLOW LINES ── -->
+        <path d="M 128 190 C 165 190 180 195 215 195" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#arrow)" class="fl"/>
+        <path d="M 395 170 C 440 170 460 110 500 110" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#arrow-green)" class="fl2"/>
+        <path d="M 395 215 C 440 215 460 235 500 235" stroke="#8b5cf6" stroke-width="2" fill="none" marker-end="url(#arrow-purple)" class="fl3"/>
+        <path d="M 305 275 L 305 325" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrow-amber)" class="fl4"/>
+        <path d="M 400 355 C 440 355 460 350 495 350" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrow-amber)" class="fl5"/>
+
+        <!-- ── COMPONENTS ── -->
+
+        <!-- Client -->
+        <rect x="20" y="155" width="108" height="70" rx="10" fill="url(#gGray)" stroke="rgba(255,255,255,.12)" stroke-width="1.5"/>
+        <text x="74" y="183" text-anchor="middle" fill="#94a3b8" font-size="22">👤</text>
+        <text x="74" y="202" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700">Client</text>
+        <text x="74" y="216" text-anchor="middle" fill="#64748b" font-size="10">HTTP Requests</text>
+
+        <!-- FastAPI -->
+        <rect x="215" y="150" width="180" height="90" rx="10" fill="url(#gBlue)" stroke="rgba(59,130,246,.5)" stroke-width="1.5"/>
+        <text x="305" y="181" text-anchor="middle" fill="#93c5fd" font-size="22">⚡</text>
+        <text x="305" y="200" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="800">FastAPI Gateway</text>
+        <text x="305" y="215" text-anchor="middle" fill="#bfdbfe" font-size="10">Inference · RAG · Agent · Metrics</text>
+        <text x="305" y="229" text-anchor="middle" fill="#93c5fd" font-size="9">:8000</text>
+
+        <!-- Ollama -->
+        <rect x="500" y="75" width="175" height="75" rx="10" fill="url(#gGreen)" stroke="rgba(16,185,129,.5)" stroke-width="1.5"/>
+        <text x="587" y="103" text-anchor="middle" fill="#6ee7b7" font-size="20">🤖</text>
+        <text x="587" y="121" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="800">Ollama LLM</text>
+        <text x="587" y="137" text-anchor="middle" fill="#a7f3d0" font-size="10">Qwen 2.5 3B · nomic-embed-text</text>
+
+        <!-- ChromaDB -->
+        <rect x="500" y="200" width="175" height="75" rx="10" fill="url(#gPurple)" stroke="rgba(139,92,246,.5)" stroke-width="1.5"/>
+        <text x="587" y="228" text-anchor="middle" fill="#c4b5fd" font-size="20">🗄</text>
+        <text x="587" y="246" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="800">ChromaDB</text>
+        <text x="587" y="262" text-anchor="middle" fill="#ddd6fe" font-size="10">Persistent Vector Store</text>
+
+        <!-- Prometheus -->
+        <rect x="215" y="325" width="185" height="70" rx="10" fill="url(#gAmber)" stroke="rgba(245,158,11,.5)" stroke-width="1.5"/>
+        <text x="307" y="351" text-anchor="middle" fill="#fde68a" font-size="20">📊</text>
+        <text x="307" y="368" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="800">Prometheus</text>
+        <text x="307" y="383" text-anchor="middle" fill="#fde68a" font-size="10">Metrics collection · :9090</text>
+
+        <!-- Grafana -->
+        <rect x="495" y="315" width="175" height="75" rx="10" fill="url(#gAmber)" stroke="rgba(245,158,11,.4)" stroke-width="1.5"/>
+        <text x="582" y="343" text-anchor="middle" fill="#fde68a" font-size="20">📈</text>
+        <text x="582" y="361" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="800">Grafana</text>
+        <text x="582" y="376" text-anchor="middle" fill="#fde68a" font-size="10">Dashboards · :3000</text>
+
+        <!-- ── LABELS ON LINES ── -->
+        <rect x="162" y="175" width="52" height="18" rx="4" fill="#1e3a8a" opacity=".9"/>
+        <text x="188" y="188" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="600">HTTP/REST</text>
+
+        <rect x="430" y="123" width="58" height="18" rx="4" fill="#064e3b" opacity=".9"/>
+        <text x="459" y="136" text-anchor="middle" fill="#6ee7b7" font-size="9" font-weight="600">Generate</text>
+
+        <rect x="430" y="210" width="52" height="18" rx="4" fill="#2e1065" opacity=".9"/>
+        <text x="456" y="223" text-anchor="middle" fill="#c4b5fd" font-size="9" font-weight="600">Embed/Search</text>
+
+        <rect x="265" y="289" width="58" height="18" rx="4" fill="#451a03" opacity=".9"/>
+        <text x="294" y="302" text-anchor="middle" fill="#fde68a" font-size="9" font-weight="600">Scrape metrics</text>
+
+        <rect x="420" y="333" width="58" height="18" rx="4" fill="#451a03" opacity=".9"/>
+        <text x="449" y="346" text-anchor="middle" fill="#fde68a" font-size="9" font-weight="600">Query data</text>
+      </svg>
+
+      <div class="arch-legend">
+        <span class="legend-item"><span class="legend-line" style="border-color:#3b82f6"></span>Client requests</span>
+        <span class="legend-item"><span class="legend-line" style="border-color:#10b981"></span>Inference / Embeddings</span>
+        <span class="legend-item"><span class="legend-line" style="border-color:#8b5cf6"></span>Vector store operations</span>
+        <span class="legend-item"><span class="legend-line" style="border-color:#f59e0b"></span>Observability</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ HOW IT WORKS ══════════ -->
+<section id="workflows">
+  <div class="container">
+    <p class="label">Workflows</p>
+    <h2 class="title">How It Works</h2>
+    <p class="subtitle">Three distinct interaction patterns, each building on the same infrastructure.</p>
+
+    <div class="tabs">
+      <button class="tab active" data-target="p1">⚡ Direct Inference</button>
+      <button class="tab" data-target="p2">📄 RAG Pipeline</button>
+      <button class="tab" data-target="p3">🤖 AI Agent</button>
+    </div>
+
+    <div id="p1" class="panel active">
+      <div class="step"><div class="step-n">1</div><div><h4>Client sends a prompt</h4><p>An HTTP POST to <code>/api/v1/inference</code> with the question, optional system prompt, temperature, and token limit.</p><span class="chip chip-blue">FastAPI</span></div></div>
+      <div class="step"><div class="step-n">2</div><div><h4>Gateway validates &amp; routes</h4><p>FastAPI validates the request schema, records a Prometheus counter, and starts a latency timer.</p><span class="chip chip-blue">FastAPI · Prometheus</span></div></div>
+      <div class="step"><div class="step-n">3</div><div><h4>Ollama generates a response</h4><p>The prompt is forwarded to Ollama's <code>/api/generate</code> endpoint. Qwen 2.5 3B runs on CPU (or GPU if available) and streams tokens until complete.</p><span class="chip chip-green">Ollama · Qwen 2.5 3B</span></div></div>
+      <div class="step"><div class="step-n">4</div><div><h4>Metrics recorded &amp; response returned</h4><p>Token count, duration, and tokens-per-second are captured. The JSON response is returned to the client with full attribution.</p><span class="chip chip-amber">~4–15 s on CPU</span></div></div>
+    </div>
+
+    <div id="p2" class="panel">
+      <div class="step"><div class="step-n">1</div><div><h4>Upload a PDF document</h4><p>A PDF is submitted via <code>POST /api/v1/documents</code> as a multipart upload. Only PDF format is accepted.</p><span class="chip chip-blue">FastAPI</span></div></div>
+      <div class="step"><div class="step-n">2</div><div><h4>Text extraction &amp; chunking</h4><p>PyPDF extracts text page-by-page. <code>RecursiveCharacterTextSplitter</code> breaks the content into 1,000-token chunks with 200-token overlap to preserve context.</p><span class="chip chip-green">LangChain · PyPDF</span></div></div>
+      <div class="step"><div class="step-n">3</div><div><h4>Embed &amp; store</h4><p>Each chunk is passed to Ollama's <code>nomic-embed-text</code> embedding model, producing a 768-dimensional vector. Vectors and metadata (filename, page) are persisted in ChromaDB.</p><span class="chip chip-green">Ollama Embeddings · ChromaDB</span></div></div>
+      <div class="step"><div class="step-n">4</div><div><h4>Query with semantic search</h4><p>A question at <code>POST /api/v1/rag/query</code> is embedded and compared against all stored vectors. The top-4 most semantically similar chunks are retrieved.</p><span class="chip chip-purple">ChromaDB · cosine similarity</span></div></div>
+      <div class="step"><div class="step-n">5</div><div><h4>Grounded answer with citations</h4><p>Retrieved chunks are injected into a strict system prompt that tells the LLM to answer only from the provided context. The response includes source filename and page numbers.</p><span class="chip chip-green">Ollama · Qwen 2.5 3B</span></div></div>
+    </div>
+
+    <div id="p3" class="panel">
+      <div class="step"><div class="step-n">1</div><div><h4>Query arrives at the agent</h4><p>A question is sent to <code>POST /api/v1/agent/query</code>. The agent can handle multi-step questions that need both document lookup and calculation.</p><span class="chip chip-blue">FastAPI · LangGraph</span></div></div>
+      <div class="step"><div class="step-n">2</div><div><h4>LangGraph ReAct loop starts</h4><p>Qwen 2.5 3B receives the query and a list of available tools. It decides which tool to call first based on the question.</p><span class="chip chip-green">LangGraph · Qwen 2.5 3B</span></div></div>
+      <div class="step"><div class="step-n">3</div><div><h4>Tool: Search Documents</h4><p>If the question requires knowledge from uploaded documents, the agent calls <code>search_documents</code> which performs a ChromaDB semantic search and returns the top matching excerpts.</p><span class="chip chip-purple">ChromaDB · nomic-embed-text</span></div></div>
+      <div class="step"><div class="step-n">4</div><div><h4>Tool: Calculator</h4><p>For numerical questions, the agent calls <code>calculate</code> — a sandboxed AST evaluator that safely handles arithmetic expressions (+, −, ×, ÷, ^) with no code execution risk.</p><span class="chip chip-amber">Safe AST Evaluator</span></div></div>
+      <div class="step"><div class="step-n">5</div><div><h4>Final answer synthesised</h4><p>After all tool calls complete, the LLM synthesises a final answer combining document evidence and computed results. The response lists all tools used and the number of reasoning steps.</p><span class="chip chip-green">LangGraph · Qwen 2.5 3B</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ METRICS ══════════ -->
+<section id="metrics">
+  <div class="container">
+    <p class="label">Observability</p>
+    <h2 class="title">Infrastructure Metrics</h2>
+    <p class="subtitle">Every inference request, RAG query, and token generated is recorded in Prometheus and visualised in Grafana in real time.</p>
+
+    <div class="disclaimer">
+      ⚠️ Simulated data — illustrative only. Real metrics are served by a live Prometheus + Grafana stack.
+    </div>
+
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-lbl">Total Requests</div>
+        <div class="stat-val" id="sv-req" style="color:var(--blue)">3,241</div>
+        <div class="stat-delta" id="sv-req-d">▲ +12 / min</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Tokens Generated</div>
+        <div class="stat-val" id="sv-tok" style="color:var(--green)">162,480</div>
+        <div class="stat-delta" id="sv-tok-d">▲ +180 / min</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Avg Latency</div>
+        <div class="stat-val" id="sv-lat" style="color:var(--amber)">4.2s</div>
+        <div class="stat-delta" style="color:var(--muted)">P50 · CPU inference</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Documents Indexed</div>
+        <div class="stat-val" id="sv-docs" style="color:var(--purple)">23</div>
+        <div class="stat-delta" style="color:var(--muted)">In ChromaDB</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-box">
+        <div class="chart-lbl">Inference Requests / min</div>
+        <canvas id="c1" height="180"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-lbl">Response Latency — P50 &amp; P95 (seconds)</div>
+        <canvas id="c2" height="180"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-lbl">Token Generation Speed (tokens / sec)</div>
+        <canvas id="c3" height="180"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-lbl">RAG Requests / min</div>
+        <canvas id="c4" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ TECH STACK ══════════ -->
+<section id="stack">
+  <div class="container">
+    <p class="label">Technology</p>
+    <h2 class="title">Stack Overview</h2>
+    <p class="subtitle">Every component is open-source, runs locally, and requires no paid API keys or cloud dependencies.</p>
+
+    <div class="tech-grid">
+      <div class="tech-card">
+        <div class="tech-icon">🤖</div>
+        <div class="tech-name">Ollama</div>
+        <div class="tech-role">LLM Inference Server</div>
+        <div class="tech-desc">Runs open-source language models locally. Provides a REST API compatible with OpenAI's format. Handles both text generation and embedding workloads.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">🧠</div>
+        <div class="tech-name">Qwen 2.5 3B</div>
+        <div class="tech-role">Language Model</div>
+        <div class="tech-desc">3-billion parameter model from Alibaba. Runs on CPU with 4–6 GB RAM. Supports tool calling, instruction following, and multi-language output.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">⚡</div>
+        <div class="tech-name">FastAPI</div>
+        <div class="tech-role">API Gateway</div>
+        <div class="tech-desc">High-performance async Python framework. Handles request validation, error handling, Prometheus metric collection, and health checks.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">🔗</div>
+        <div class="tech-name">LangChain + LangGraph</div>
+        <div class="tech-role">RAG Orchestration + Agents</div>
+        <div class="tech-desc">LangChain orchestrates the full RAG pipeline — text splitting, embedding, retrieval. LangGraph powers the ReAct agent loop with tool calling.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">🗄</div>
+        <div class="tech-name">ChromaDB</div>
+        <div class="tech-role">Vector Database</div>
+        <div class="tech-desc">Persistent vector store for document embeddings. Runs as a standalone service with HTTP API. Supports cosine similarity search over millions of vectors.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">📊</div>
+        <div class="tech-name">Prometheus + Grafana</div>
+        <div class="tech-role">Observability</div>
+        <div class="tech-desc">Prometheus scrapes 8 custom metrics every 15 s. Grafana dashboard auto-provisions on startup — inference volume, latency, error rate, and token throughput.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">🐳</div>
+        <div class="tech-name">Docker Compose</div>
+        <div class="tech-role">Local Deployment</div>
+        <div class="tech-desc">Single <code>docker compose up -d</code> starts all five services. Persistent volumes, health checks, and environment-based configuration included.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">☸️</div>
+        <div class="tech-name">Kubernetes</div>
+        <div class="tech-role">Container Orchestration</div>
+        <div class="tech-desc">Full manifest set for Namespace, ConfigMap, Secrets, PVCs, Deployments, and Services. Works on Minikube, k3d, GKE, EKS, and AKS.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">⛵</div>
+        <div class="tech-name">Helm</div>
+        <div class="tech-role">Kubernetes Packaging</div>
+        <div class="tech-desc">Parameterised Helm chart with values for model selection, resource limits, and optional NVIDIA GPU scheduling. Passes <code>helm lint</code> clean.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ API ══════════ -->
+<section id="api">
+  <div class="container">
+    <p class="label">API Reference</p>
+    <h2 class="title">Key Endpoints</h2>
+    <p class="subtitle">All endpoints are served from the FastAPI gateway at <code>:8000</code>. Full OpenAPI docs available at <code>/docs</code>.</p>
+
+    <div class="api-cards">
+      <div class="api-card">
+        <div class="api-head">
+          <span class="method m-get">GET</span>
+          <span class="api-path">/health</span>
+          <span class="api-note">Service health + Ollama status</span>
+        </div>
+        <pre><span class="c">// Response</span>
+{
+  <span class="k">"status"</span>: <span class="s">"healthy"</span>,
+  <span class="k">"ollama"</span>: <span class="s">"up"</span>,
+  <span class="k">"version"</span>: <span class="s">"1.0.0"</span>
+}</pre>
+      </div>
+
+      <div class="api-card">
+        <div class="api-head">
+          <span class="method m-post">POST</span>
+          <span class="api-path">/api/v1/inference</span>
+          <span class="api-note">Direct LLM generation</span>
+        </div>
+        <pre><span class="c">// Request</span>
+{
+  <span class="k">"prompt"</span>: <span class="s">"Summarise the key risks in the attached report."</span>,
+  <span class="k">"model"</span>: <span class="s">"qwen2.5:3b"</span>,
+  <span class="k">"temperature"</span>: <span class="n">0.7</span>,
+  <span class="k">"max_tokens"</span>: <span class="n">1024</span>
+}
+
+<span class="c">// Response</span>
+{
+  <span class="k">"text"</span>: <span class="s">"The report identifies three primary risks..."</span>,
+  <span class="k">"tokens_generated"</span>: <span class="n">142</span>,
+  <span class="k">"duration_seconds"</span>: <span class="n">9.4</span>,
+  <span class="k">"tokens_per_second"</span>: <span class="n">15.1</span>
+}</pre>
+      </div>
+
+      <div class="api-card">
+        <div class="api-head">
+          <span class="method m-post">POST</span>
+          <span class="api-path">/api/v1/documents</span>
+          <span class="api-note">Upload &amp; index a PDF</span>
+        </div>
+        <pre><span class="c">// multipart/form-data  →  file: annual_report.pdf</span>
+
+<span class="c">// Response</span>
+{
+  <span class="k">"message"</span>: <span class="s">"Document indexed successfully"</span>,
+  <span class="k">"filename"</span>: <span class="s">"annual_report.pdf"</span>,
+  <span class="k">"pages"</span>: <span class="n">48</span>,
+  <span class="k">"chunks"</span>: <span class="n">187</span>
+}</pre>
+      </div>
+
+      <div class="api-card">
+        <div class="api-head">
+          <span class="method m-post">POST</span>
+          <span class="api-path">/api/v1/rag/query</span>
+          <span class="api-note">Document-grounded Q&amp;A</span>
+        </div>
+        <pre><span class="c">// Request</span>
+{
+  <span class="k">"question"</span>: <span class="s">"What were the key findings in Q3?"</span>,
+  <span class="k">"top_k"</span>: <span class="n">4</span>
+}
+
+<span class="c">// Response</span>
+{
+  <span class="k">"answer"</span>: <span class="s">"According to [annual_report.pdf, p.12], Q3 saw..."</span>,
+  <span class="k">"sources"</span>: [{ <span class="k">"filename"</span>: <span class="s">"annual_report.pdf"</span>, <span class="k">"page"</span>: <span class="n">12</span> }],
+  <span class="k">"context_used"</span>: <span class="n">true</span>,
+  <span class="k">"chunks_retrieved"</span>: <span class="n">4</span>
+}</pre>
+      </div>
+
+      <div class="api-card">
+        <div class="api-head">
+          <span class="method m-post">POST</span>
+          <span class="api-path">/api/v1/agent/query</span>
+          <span class="api-note">Multi-step AI agent</span>
+        </div>
+        <pre><span class="c">// Request</span>
+{ <span class="k">"query"</span>: <span class="s">"What is the budget projection? Also calculate 1.08 * 2500000."</span> }
+
+<span class="c">// Response</span>
+{
+  <span class="k">"answer"</span>: <span class="s">"The report projects $2.5M. At 8% growth: $2,700,000."</span>,
+  <span class="k">"tools_used"</span>: [<span class="s">"search_documents"</span>, <span class="s">"calculate"</span>],
+  <span class="k">"steps"</span>: <span class="n">5</span>
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer>
+  <div class="container">
+    <p>LLMOps Platform — Self-hosted AI infrastructure for LLM serving and RAG.</p>
+    <p style="margin-top:.5rem">
+      <a href="https://github.com/Badsati/llmops" target="_blank">github.com/Badsati/llmops</a>
+      &nbsp;·&nbsp; MIT License &nbsp;·&nbsp; Ollama · FastAPI · ChromaDB · Prometheus · Grafana
+    </p>
+    <div class="footer-stack">
+      <span class="pill">No paid APIs</span>
+      <span class="pill">Runs on 8 GB RAM</span>
+      <span class="pill">CPU + GPU support</span>
+      <span class="pill">Docker Compose + Kubernetes</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── TAB SWITCHING ──
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById(t.dataset.target).classList.add('active');
+    });
+  });
+
+  // ── CHART HELPERS ──
+  const N = 20;
+  const now = Date.now();
+  const labels = () => Array.from({length: N}, (_, i) => {
+    const d = new Date(now - (N - 1 - i) * 15000);
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + ':' + d.getSeconds().toString().padStart(2,'0');
+  });
+
+  const rand = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(2);
+  const randArr = (lo, hi, n = N) => Array.from({length: n}, () => rand(lo, hi));
+
+  const chartDefaults = {
+    responsive: true,
+    animation: false,
+    plugins: {legend: {labels: {color: '#94a3b8', font: {size: 11}}}},
+    scales: {
+      x: {ticks: {color: '#4b5563', maxTicksLimit: 6, font: {size: 10}}, grid: {color: 'rgba(255,255,255,.04)'}},
+      y: {ticks: {color: '#4b5563', font: {size: 10}}, grid: {color: 'rgba(255,255,255,.04)'}}
+    }
+  };
+
+  const lbs = labels();
+
+  // Chart 1 — Inference req/min
+  const c1 = new Chart(document.getElementById('c1'), {
+    type: 'line',
+    data: {
+      labels: [...lbs],
+      datasets: [{
+        label: 'req/min', data: randArr(5, 65),
+        borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.08)',
+        fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2
+      }]
+    },
+    options: {...chartDefaults}
+  });
+
+  // Chart 2 — Latency
+  const c2 = new Chart(document.getElementById('c2'), {
+    type: 'line',
+    data: {
+      labels: [...lbs],
+      datasets: [
+        {label: 'P50', data: randArr(2.5, 5.5), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.06)', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2},
+        {label: 'P95', data: randArr(7, 15),   borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.06)', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2}
+      ]
+    },
+    options: {...chartDefaults}
+  });
+
+  // Chart 3 — Tokens/sec
+  const c3 = new Chart(document.getElementById('c3'), {
+    type: 'line',
+    data: {
+      labels: [...lbs],
+      datasets: [{
+        label: 'tokens/sec', data: randArr(8, 18),
+        borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,.08)',
+        fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2
+      }]
+    },
+    options: {...chartDefaults}
+  });
+
+  // Chart 4 — RAG req/min
+  const c4 = new Chart(document.getElementById('c4'), {
+    type: 'bar',
+    data: {
+      labels: [...lbs].filter((_, i) => i % 4 === 0),
+      datasets: [{
+        label: 'RAG req/min', data: randArr(1, 18, 5),
+        backgroundColor: 'rgba(16,185,129,.35)', borderColor: '#10b981', borderWidth: 1, borderRadius: 3
+      }]
+    },
+    options: {...chartDefaults}
+  });
+
+  // ── LIVE SIMULATION ──
+  let req = 3241, tok = 162480;
+  const charts = [c1, c2, c3, c4];
+
+  setInterval(() => {
+    const t = new Date();
+    const timeStr = t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0') + ':' + t.getSeconds().toString().padStart(2,'0');
+
+    // Update request chart
+    c1.data.labels.push(timeStr); c1.data.labels.shift();
+    c1.data.datasets[0].data.push(rand(5, 65)); c1.data.datasets[0].data.shift();
+    c1.update('none');
+
+    // Update latency chart
+    c2.data.labels.push(timeStr); c2.data.labels.shift();
+    c2.data.datasets[0].data.push(rand(2.5, 5.5)); c2.data.datasets[0].data.shift();
+    c2.data.datasets[1].data.push(rand(7, 15)); c2.data.datasets[1].data.shift();
+    c2.update('none');
+
+    // Update tokens chart
+    c3.data.labels.push(timeStr); c3.data.labels.shift();
+    c3.data.datasets[0].data.push(rand(8, 18)); c3.data.datasets[0].data.shift();
+    c3.update('none');
+
+    // Update stats
+    const delta = Math.floor(rand(5, 20));
+    const tokDelta = delta * Math.floor(rand(10, 20));
+    req += delta; tok += tokDelta;
+    document.getElementById('sv-req').textContent = req.toLocaleString();
+    document.getElementById('sv-req-d').textContent = `▲ +${delta} / min`;
+    document.getElementById('sv-tok').textContent = tok.toLocaleString();
+    document.getElementById('sv-tok-d').textContent = `▲ +${tokDelta} / min`;
+    const lat = rand(3.5, 5.2);
+    document.getElementById('sv-lat').textContent = lat.toFixed(1) + 's';
+  }, 2000);
+</script>
+</body>
+</html>
