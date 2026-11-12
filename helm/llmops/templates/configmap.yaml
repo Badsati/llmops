@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llmops-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "llmops.labels" . | nindent 4 }}
+data:
+  OLLAMA_HOST: "http://ollama:11434"
+  OLLAMA_MODEL: {{ .Values.ollama.model | quote }}
+  EMBEDDING_MODEL: {{ .Values.ollama.embeddingModel | quote }}
+  CHROMA_HOST: "chromadb"
+  CHROMA_PORT: "8000"
+  CHROMA_COLLECTION: {{ .Values.chromadb.collection | quote }}
+  RAG_CHUNK_SIZE: {{ .Values.api.rag.chunkSize | quote }}
+  RAG_CHUNK_OVERLAP: {{ .Values.api.rag.chunkOverlap | quote }}
+  RAG_TOP_K: {{ .Values.api.rag.topK | quote }}
+  LOG_LEVEL: {{ .Values.api.logLevel | quote }}

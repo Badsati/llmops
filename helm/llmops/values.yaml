@@ -1,0 +1,73 @@
+namespace: llmops
+
+ollama:
+  image:
+    repository: ollama/ollama
+    tag: latest
+    pullPolicy: IfNotPresent
+  model: qwen2.5:3b
+  embeddingModel: nomic-embed-text
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+  persistence:
+    size: 20Gi
+  # GPU scheduling — disabled by default (works on CPU-only clusters)
+  gpu:
+    enabled: false
+    # nodeSelector:
+    #   accelerator: nvidia-gpu
+    # tolerations:
+    #   - key: nvidia.com/gpu
+    #     operator: Exists
+    #     effect: NoSchedule
+    # resources:
+    #   limits:
+    #     nvidia.com/gpu: "1"
+
+chromadb:
+  image:
+    repository: chromadb/chroma
+    tag: "0.5.23"
+    pullPolicy: IfNotPresent
+  collection: documents
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  persistence:
+    size: 5Gi
+
+api:
+  image:
+    repository: llmops-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+  rag:
+    chunkSize: 1000
+    chunkOverlap: 200
+    topK: 4
+  logLevel: INFO
+
+grafana:
+  adminUser: admin
+  # Override with a secret in production
+  adminPassword: changeme
+
+prometheus:
+  scrapeInterval: 15s

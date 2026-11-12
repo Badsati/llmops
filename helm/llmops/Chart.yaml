@@ -1,0 +1,14 @@
+apiVersion: v2
+name: llmops
+description: Self-hosted LLM serving and RAG platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - llm
+  - rag
+  - ollama
+  - ai
+  - inference
+maintainers:
+  - name: llmops-platform

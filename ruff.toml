@@ -1,0 +1,6 @@
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]   # long lines are acceptable in prompt strings
+
+[lint.per-file-ignores]
+"tests/*" = ["F811"]  # fixture redefinition is normal in pytest

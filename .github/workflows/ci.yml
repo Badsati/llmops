@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Python tests ────────────────────────────────────────────────────────────
+  test:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+  # ── Python lint / type-check ─────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install linting tools
+        run: pip install ruff
+
+      - name: Run ruff
+        run: ruff check app/ tests/
+
+  # ── YAML / JSON validation ───────────────────────────────────────────────────
+  validate-configs:
+    name: Validate configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate YAML files
+        run: |
+          python - <<'EOF'
+          import yaml, json, sys, pathlib
+
+          yaml_files = [
+            "monitoring/prometheus.yml",
+            "monitoring/grafana/provisioning/datasources/prometheus.yml",
+            "monitoring/grafana/provisioning/dashboards/dashboard.yml",
+            "kubernetes/manifests/namespace.yaml",
+            "kubernetes/manifests/configmap.yaml",
+            "kubernetes/manifests/secret.yaml",
+            "kubernetes/manifests/pvcs.yaml",
+            "kubernetes/manifests/ollama.yaml",
+            "kubernetes/manifests/chromadb.yaml",
+            "kubernetes/manifests/fastapi.yaml",
+            "docker-compose.yml",
+          ]
+          for f in yaml_files:
+              yaml.safe_load(pathlib.Path(f).read_text())
+              print(f"  OK  {f}")
+
+          json_files = [
+            "monitoring/grafana/dashboards/llmops.json",
+          ]
+          for f in json_files:
+              json.loads(pathlib.Path(f).read_text())
+              print(f"  OK  {f}")
+
+          print("All configuration files are valid.")
+          EOF
+
+  # ── Docker build ─────────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: false
+          tags: llmops-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Helm lint ─────────────────────────────────────────────────────────────────
+  helm-lint:
+    name: Helm lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint Helm chart
+        run: helm lint helm/llmops/
